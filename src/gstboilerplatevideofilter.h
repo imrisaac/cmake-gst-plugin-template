@@ -39,6 +39,14 @@ struct _GstBoilerPlateVideoFilter
 {
   GstVideoFilter base_boilerplatevideofilter;
 
+  GstPad *srcpad;
+  GstPad *ir_sinkpad;
+  GstPad *eo_sinkpad;
+
+  GstCollectPads *cpads;
+
+  gint count;
+
   // properties
   gint int_property;
   bool bool_property;

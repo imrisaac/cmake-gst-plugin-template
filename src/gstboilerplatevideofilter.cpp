@@ -36,14 +36,25 @@
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/video/gstvideofilter.h>
+#include <gst/base/gstcollectpads.h>
 #include "gstboilerplatevideofilter.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_boilerplatevideofilter_debug_category);
 #define GST_CAT_DEFAULT gst_boilerplatevideofilter_debug_category
 
-#define ARC_SECS_PER_RADIAN 206265
+static GstStaticPadTemplate eo_sink_factory = GST_STATIC_PAD_TEMPLATE ("eo_sink",
+    GST_PAD_SINK,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("{ BGR }"))
+    );
 
-/* prototypes */
+static GstStaticPadTemplate ir_sink_factory = GST_STATIC_PAD_TEMPLATE ("ir_sink",
+    GST_PAD_SINK,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("{ BGR }"))
+    );
+
+/* prototypes boilerplatevideofilter */
 static void gst_boilerplatevideofilter_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
 static void gst_boilerplatevideofilter_get_property (GObject * object,
@@ -56,6 +67,9 @@ static GstFlowReturn gst_boilerplatevideofilter_transform_frame (GstVideoFilter 
     GstVideoFrame * inframe, GstVideoFrame * outframe);
 static GstFlowReturn gst_boilerplatevideofilter_transform_frame_ip (GstVideoFilter *
     filter, GstVideoFrame * frame);
+
+static GstFlowReturn gst_boilerplatevideofilter_collect_pads (GstCollectPads * cpads,
+    GstBoilerPlateVideoFilter * boilerplatevideofilter);
 
 #define DEFAULT_INT_PROPERTY 5
 #define DEFAULT_BOOL_PROPERTY 0
@@ -92,10 +106,15 @@ gst_boilerplatevideofilter_class_init (GstBoilerPlateVideoFilterClass * klass)
   gst_element_class_add_pad_template (GST_ELEMENT_CLASS (klass),
       gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS,
           gst_caps_from_string (VIDEO_SRC_CAPS)));
-  gst_element_class_add_pad_template (GST_ELEMENT_CLASS (klass),
-      gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
-          gst_caps_from_string (VIDEO_SINK_CAPS)));
+  // gst_element_class_add_pad_template (GST_ELEMENT_CLASS (klass),
+  //     gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
+  //         gst_caps_from_string (VIDEO_SINK_CAPS)));
 
+  gst_element_class_add_static_pad_template (GST_ELEMENT_CLASS (klass), 
+      &eo_sink_factory);
+  gst_element_class_add_static_pad_template (GST_ELEMENT_CLASS (klass), 
+      &ir_sink_factory);
+  
   gst_element_class_set_static_metadata (GST_ELEMENT_CLASS (klass),
       "Gstreamer Object Tracker", "Generic", "Object and scene tracking gsreamer plugin",
       "Isaac Reed <ireed@altavian.com>");
@@ -123,9 +142,74 @@ gst_boilerplatevideofilter_class_init (GstBoilerPlateVideoFilterClass * klass)
 static void
 gst_boilerplatevideofilter_init (GstBoilerPlateVideoFilter * boilerplatevideofilter)
 {
+  boilerplatevideofilter->cpads = gst_collect_pads_new ();
+  gst_collect_pads_set_function (boilerplatevideofilter->cpads,
+      (GstCollectPadsFunction) GST_DEBUG_FUNCPTR (gst_boilerplatevideofilter_collect_pads),
+      boilerplatevideofilter);
+
+  boilerplatevideofilter->eo_sinkpad = 
+      gst_pad_new_from_static_template(&eo_sink_factory, eo_sink_factory.name_template);
+  GST_PAD_SET_PROXY_CAPS(boilerplatevideofilter->eo_sinkpad);
+  gst_element_add_pad (GST_ELEMENT (boilerplatevideofilter),
+      boilerplatevideofilter->eo_sinkpad);
+  
+  boilerplatevideofilter->ir_sinkpad = 
+      gst_pad_new_from_static_template(&ir_sink_factory, ir_sink_factory.name_template);
+  gst_element_add_pad (GST_ELEMENT (boilerplatevideofilter),
+      boilerplatevideofilter->ir_sinkpad);
+
+  gst_collect_pads_add_pad (boilerplatevideofilter->cpads, boilerplatevideofilter->eo_sinkpad,
+      sizeof (GstCollectData), NULL, TRUE);
+  gst_collect_pads_add_pad (boilerplatevideofilter->cpads, boilerplatevideofilter->ir_sinkpad,
+      sizeof (GstCollectData), NULL, TRUE);
+
   // set default prorerty values
   boilerplatevideofilter->int_property = DEFAULT_INT_PROPERTY;
   boilerplatevideofilter->bool_property = DEFAULT_BOOL_PROPERTY;
+}
+
+static GstFlowReturn
+gst_boilerplatevideofilter_collect_pads (GstCollectPads * cpads, GstBoilerPlateVideoFilter * boilerplatevideofilter)
+{
+  GstBuffer *buf1, *buf2;
+  GstCaps *caps1, *caps2;
+
+  // buf1 = gst_collect_pads_pop (comp->cpads,
+  //     gst_pad_get_element_private (comp->sinkpad));
+  // caps1 = gst_pad_get_current_caps (comp->sinkpad);
+
+  // buf2 = gst_collect_pads_pop (comp->cpads,
+  //     gst_pad_get_element_private (comp->checkpad));
+  // caps2 = gst_pad_get_current_caps (comp->checkpad);
+
+  // if (!buf1 && !buf2) {
+  //   gst_pad_push_event (comp->srcpad, gst_event_new_eos ());
+  //   return GST_FLOW_EOS;
+  // } else if (buf1 && buf2) {
+  //   gst_compare_buffers (comp, buf1, caps1, buf2, caps2);
+  // } else {
+  //   GST_WARNING_OBJECT (comp, "buffer %p != NULL", buf1 ? buf1 : buf2);
+
+  //   comp->count++;
+  //   gst_element_post_message (GST_ELEMENT (comp),
+  //       gst_message_new_element (GST_OBJECT (comp),
+  //           gst_structure_new ("delta", "count", G_TYPE_INT, comp->count,
+  //               NULL)));
+  // }
+
+  // if (buf1)
+  //   gst_pad_push (comp->srcpad, buf1);
+
+  // if (buf2)
+  //   gst_buffer_unref (buf2);
+
+  // if (caps1)
+  //   gst_caps_unref (caps1);
+
+  // if (caps2)
+  //   gst_caps_unref (caps2);
+
+  return GST_FLOW_OK;
 }
 
 void
