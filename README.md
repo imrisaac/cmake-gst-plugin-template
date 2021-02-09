@@ -1,13 +1,5 @@
 # GStremer Boilerplate Element Plugin with CMake Build System
 
-# Example Pipelines
-        
-## Ubuntu 18.04 X86 Desktop
-
-If you have any usb webcam(this includes most laptop cams) on you system you can use this pipeline to test
-
-    gst-launch-1.0 videotestsrc ! boilerplatevideofilter ! videoconvert ! fpsdisplaysink
-
 # Building
 
 Navigate to the top project directory, same directory this readme is in.
@@ -36,6 +28,10 @@ Tell gstreamer where to look for the newly build plugin
 Use `gst-inspect-1.0` to check the new plugin
 
     gst-inspect-1.0 boilerplatevideofilter
+
+Test the element in a pipeline
+
+    gst-launch-1.0 videotestsrc ! boilerplatevideofilter ! videoconvert ! fpsdisplaysink
 
 # Generating a Debian Package
 
